@@ -3,7 +3,9 @@ local Basic = Class:extend()
 function Basic:new()
     self.canRender = true
     self.canUpdate = true
-    self.cameras = {}
+    self.camera = nil
+    self._addtogroup = true
+    self.z = 0
 
 end
 
@@ -13,7 +15,11 @@ end
 function Basic:render()
 end
 
-function Basic:isOnScreen()
+function Basic:preRender(camera)
+  
+end
+
+function Basic:isOnScreen(camera)
     return false
 end
 return Basic

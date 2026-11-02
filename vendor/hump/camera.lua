@@ -22,101 +22,118 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-]]--
+]] --
 
 local _PATH = (...):match('^(.*[%./])[^%.%/]+$') or ''
 local cos, sin = math.cos, math.sin
 
 local camera = {}
 camera.__index = camera
+camera.drawQueue = {}
 
 -- Movement interpolators (for camera locking/windowing)
 camera.smooth = {}
 
 function camera.smooth.none()
-	return function(dx,dy) return dx,dy end
+	return function(dx, dy) return dx, dy end
 end
 
 function camera.smooth.linear(speed)
-	assert(type(speed) == "number", "Invalid parameter: speed = "..tostring(speed))
-	return function(dx,dy, s)
+	assert(type(speed) == "number", "Invalid parameter: speed = " .. tostring(speed))
+	return function(dx, dy, s)
 		-- normalize direction
-		local d = math.sqrt(dx*dx+dy*dy)
+		local d = math.sqrt(dx * dx + dy * dy)
 		local dts = math.min((s or speed) * love.timer.getDelta(), d) -- prevent overshooting the goal
 		if d > 0 then
-			dx,dy = dx/d, dy/d
+			dx, dy = dx / d, dy / d
 		end
 
-		return dx*dts, dy*dts
+		return dx * dts, dy * dts
 	end
 end
 
 function camera.smooth.damped(stiffness)
-	assert(type(stiffness) == "number", "Invalid parameter: stiffness = "..tostring(stiffness))
-	return function(dx,dy, s)
+	assert(type(stiffness) == "number", "Invalid parameter: stiffness = " .. tostring(stiffness))
+	return function(dx, dy, s)
 		local dts = love.timer.getDelta() * (s or stiffness)
-		return dx*dts, dy*dts
+		return dx * dts, dy * dts
 	end
 end
 
-
-local function new(x,y, zoom, rot, smoother)
-	x,y  = x or love.graphics.getWidth()/2, y or love.graphics.getHeight()/2
-	zoom = zoom or 1
-	rot  = rot or 0
+local function new(x, y, zoom, rot, smoother)
+	x, y     = x or love.graphics.getWidth() / 2, y or love.graphics.getHeight() / 2
+	zoom     = zoom or 1
+	rot      = rot or 0
 	smoother = smoother or camera.smooth.none() -- for locking, see below
-	return setmetatable({x = x, y = y, scale = zoom, rot = rot, smoother = smoother}, camera)
+	return setmetatable({ x = x, y = y, scale = zoom, rot = rot, smoother = smoother }, camera)
 end
 
-function camera:lookAt(x,y)
+function camera:lookAt(x, y)
 	self.x, self.y = x, y
 	return self
 end
 
-function camera:move(dx,dy)
+function camera:move(dx, dy)
 	self.x, self.y = self.x + dx, self.y + dy
 	return self
 end
 
 function camera:getCameraBounds()
-    local camera = self
-    -- Berechne die obere linke und die untere rechte Ecke des Fensters
-    local x1, y1 = camera:worldCoords(0, 0)
-    local x2, y2 = camera:worldCoords(love.graphics.getWidth(), love.graphics.getHeight())
-    
-    -- Da die Kamera rotiert sein kann, stellen wir sicher, 
-    -- dass wir das minimale und maximale AABB (Axis-Aligned Bounding Box) erhalten
-    local left   = math.min(x1, x2)
-    local right  = math.max(x1, x2)
-    local top    = math.min(y1, y2)
-    local bottom = math.max(y1, y2)
-    
-    return left, right, top, bottom
+	local camera = self
+	-- Berechne die obere linke und die untere rechte Ecke des Fensters
+	local x1, y1 = camera:worldCoords(0, 0)
+	local x2, y2 = camera:worldCoords(love.graphics.getWidth(), love.graphics.getHeight())
+
+	-- Da die Kamera rotiert sein kann, stellen wir sicher,
+	-- dass wir das minimale und maximale AABB (Axis-Aligned Bounding Box) erhalten
+	local left   = math.min(x1, x2)
+	local right  = math.max(x1, x2)
+	local top    = math.min(y1, y2)
+	local bottom = math.max(y1, y2)
+
+	return left, right, top, bottom
 end
 
 function camera:isInsideCamera(obj)
-    local camera = self
-    local cLeft, cRight, cTop, cBottom = camera:getCameraBounds()
-    
-    -- Das Objekt hat eine Position (x, y) und Dimensionen (w, h)
-    local oLeft   = obj.x
-    local oRight  = obj.x + (obj.w or 0)
-    local oTop    = obj.y
-    local oBottom = obj.y + (obj.h or 0)
-    
-    -- Wenn eine dieser Bedingungen zutrifft, ist das Objekt AUßERHALB
-    if oRight < cLeft or oLeft > cRight or oBottom < cTop or oTop > cBottom then
-        return false
-    end
-    
-    -- Ansonsten ist es sichtbar
-    return true
+	local camera                       = self
+	local cLeft, cRight, cTop, cBottom = camera:getCameraBounds()
+
+	-- Das Objekt hat eine Position (x, y) und Dimensionen (w, h)
+	local oLeft                        = obj.x
+	local oRight                       = obj.x + (obj.w or 0)
+	local oTop                         = obj.y
+	local oBottom                      = obj.y + (obj.h or 0)
+
+	-- Wenn eine dieser Bedingungen zutrifft, ist das Objekt AUßERHALB
+	if oRight < cLeft or oLeft > cRight or oBottom < cTop or oTop > cBottom then
+		return false
+	end
+
+	-- Ansonsten ist es sichtbar
+	return true
 end
-
-
 
 function camera:position()
 	return self.x, self.y
+end
+
+function camera:addToDrawQueue(drawFunc, zindex)
+	if not zindex then zindex = 0 end
+	table.insert(self.drawQueue, { layer = zindex, renderFunc = drawFunc })
+end
+
+function camera:renderAll()
+	table.sort(self.drawQueue, function(a, b)
+		return a.layer < b.layer
+	end)
+
+
+	for _, command in ipairs(self.drawQueue) do
+		command.render()
+	end
+
+
+	self.drawQueue = {}
 end
 
 function camera:rotate(phi)
@@ -139,16 +156,16 @@ function camera:zoomTo(zoom)
 	return self
 end
 
-function camera:attach(x,y,w,h, noclip)
-	x,y = x or 0, y or 0
-	w,h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
+function camera:attach(x, y, w, h, noclip)
+	x, y = x or 0, y or 0
+	w, h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
 
-	self._sx,self._sy,self._sw,self._sh = love.graphics.getScissor()
+	self._sx, self._sy, self._sw, self._sh = love.graphics.getScissor()
 	if not noclip then
-		love.graphics.setScissor(x,y,w,h)
+		love.graphics.setScissor(x, y, w, h)
 	end
 
-	local cx,cy = x+w/2, y+h/2
+	local cx, cy = x + w / 2, y + h / 2
 	love.graphics.push()
 	love.graphics.translate(cx, cy)
 	love.graphics.scale(self.scale)
@@ -158,54 +175,54 @@ end
 
 function camera:detach()
 	love.graphics.pop()
-	love.graphics.setScissor(self._sx,self._sy,self._sw,self._sh)
+	love.graphics.setScissor(self._sx, self._sy, self._sw, self._sh)
 end
 
 function camera:draw(...)
-	local x,y,w,h,noclip,func
+	local x, y, w, h, noclip, func
 	local nargs = select("#", ...)
 	if nargs == 1 then
 		func = ...
 	elseif nargs == 5 then
-		x,y,w,h,func = ...
+		x, y, w, h, func = ...
 	elseif nargs == 6 then
-		x,y,w,h,noclip,func = ...
+		x, y, w, h, noclip, func = ...
 	else
 		error("Invalid arguments to camera:draw()")
 	end
 
-	self:attach(x,y,w,h,noclip)
+	self:attach(x, y, w, h, noclip)
 	func()
 	self:detach()
 end
 
 -- world coordinates to camera coordinates
-function camera:cameraCoords(x,y, ox,oy,w,h)
+function camera:cameraCoords(x, y, ox, oy, w, h)
 	ox, oy = ox or 0, oy or 0
-	w,h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
+	w, h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
 
 	-- x,y = ((x,y) - (self.x, self.y)):rotated(self.rot) * self.scale + center
-	local c,s = cos(self.rot), sin(self.rot)
-	x,y = x - self.x, y - self.y
-	x,y = c*x - s*y, s*x + c*y
-	return x*self.scale + w/2 + ox, y*self.scale + h/2 + oy
+	local c, s = cos(self.rot), sin(self.rot)
+	x, y = x - self.x, y - self.y
+	x, y = c * x - s * y, s * x + c * y
+	return x * self.scale + w / 2 + ox, y * self.scale + h / 2 + oy
 end
 
 -- camera coordinates to world coordinates
-function camera:worldCoords(x,y, ox,oy,w,h)
+function camera:worldCoords(x, y, ox, oy, w, h)
 	ox, oy = ox or 0, oy or 0
-	w,h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
+	w, h = w or love.graphics.getWidth(), h or love.graphics.getHeight()
 
 	-- x,y = (((x,y) - center) / self.scale):rotated(-self.rot) + (self.x,self.y)
-	local c,s = cos(-self.rot), sin(-self.rot)
-	x,y = (x - w/2 - ox) / self.scale, (y - h/2 - oy) / self.scale
-	x,y = c*x - s*y, s*x + c*y
-	return x+self.x, y+self.y
+	local c, s = cos(-self.rot), sin(-self.rot)
+	x, y = (x - w / 2 - ox) / self.scale, (y - h / 2 - oy) / self.scale
+	x, y = c * x - s * y, s * x + c * y
+	return x + self.x, y + self.y
 end
 
-function camera:mousePosition(ox,oy,w,h)
-	local mx,my = love.mouse.getPosition()
-	return self:worldCoords(mx,my, ox,oy,w,h)
+function camera:mousePosition(ox, oy, w, h)
+	local mx, my = love.mouse.getPosition()
+	return self:worldCoords(mx, my, ox, oy, w, h)
 end
 
 -- camera scrolling utilities
@@ -221,14 +238,14 @@ function camera:lockY(y, smoother, ...)
 	return self
 end
 
-function camera:lockPosition(x,y, smoother, ...)
+function camera:lockPosition(x, y, smoother, ...)
 	return self:move((smoother or self.smoother)(x - self.x, y - self.y, ...))
 end
 
 function camera:lockWindow(x, y, x_min, x_max, y_min, y_max, smoother, ...)
 	-- figure out displacement in camera coordinates
-	x,y = self:cameraCoords(x,y)
-	local dx, dy = 0,0
+	x, y = self:cameraCoords(x, y)
+	local dx, dy = 0, 0
 	if x < x_min then
 		dx = x - x_min
 	elseif x > x_max then
@@ -241,13 +258,13 @@ function camera:lockWindow(x, y, x_min, x_max, y_min, y_max, smoother, ...)
 	end
 
 	-- transform displacement to movement in world coordinates
-	local c,s = cos(-self.rot), sin(-self.rot)
-	dx,dy = (c*dx - s*dy) / self.scale, (s*dx + c*dy) / self.scale
+	local c, s = cos(-self.rot), sin(-self.rot)
+	dx, dy = (c * dx - s * dy) / self.scale, (s * dx + c * dy) / self.scale
 
 	-- move
-	self:move((smoother or self.smoother)(dx,dy,...))
+	self:move((smoother or self.smoother)(dx, dy, ...))
 end
 
 -- the module
-return setmetatable({new = new, smooth = camera.smooth},
-	{__call = function(_, ...) return new(...) end})
+return setmetatable({ new = new, smooth = camera.smooth },
+	{ __call = function(_, ...) return new(...) end })

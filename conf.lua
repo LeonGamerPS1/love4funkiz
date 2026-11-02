@@ -6,7 +6,7 @@ function love.conf(t)
     t.window.width = 1280                      -- Standardbreite des Fensters in Pixeln
     t.window.height = 720                     -- Standardhöhe des Fensters in Pixeln
     t.window.borderless = false               -- Wenn true, wird das Fenster ohne Rahmen dargestellt
-    t.window.resizable = true                -- Bestimmt, ob der Spieler die Fenstergröße ändern kann
+    t.window.resizable = false                -- Bestimmt, ob der Spieler die Fenstergröße ändern kann
     t.window.minwidth = 1                   -- Minimale Breite (falls resizable = true)
     t.window.minheight = 1                    -- Minimale Höhe (falls resizable = true)
     t.window.fullscreen = false               -- Startet das Spiel direkt im Vollbildmodus
@@ -22,13 +22,13 @@ function love.conf(t)
     -- PROJEKT-INFORMATIONEN
     -- =========================================================================
     t.identity = "love4funkiz"       -- Name des Speicherordners für Spielstände (in AppData/Application Support)
-    t.version = "11.5"                        -- Die LÖVE-Version, für die das Spiel geschrieben wurde (z.B. "11.5")
+    t.version = "11.5"                       -- Die LÖVE-Version, für die das Spiel geschrieben wurde (z.B. "11.5")
 
     -- =========================================================================
     -- SYSTEM & KONSOLE
     -- =========================================================================
-    t.console = true                          -- Öffnet unter Windows zusätzlich ein Konsolenfenster für print()-Befehle
-    t.accelerometerjoystick = true            -- (Mobilgeräte) Registriert den Beschleunigungssensor als Joystick
+    t.console = false                          -- Öffnet unter Windows zusätzlich ein Konsolenfenster für print()-Befehle
+    t.accelerometerjoystick = false            -- (Mobilgeräte) Registriert den Beschleunigungssensor als Joystick
     t.externalstorage = true                 -- (Android) True erlaubt das Speichern auf externen Speichergeräten
     t.gamedpadupdaterate = 0                  -- Wie oft Gamepad-Zuweisungen aktualisiert werden (0 = Standard)
 
@@ -51,6 +51,6 @@ function love.conf(t)
     t.modules.thread = false                   -- Aktiviert Multithreading (Hintergrundprozesse)
     t.modules.timer = true                    -- Aktiviert das Timer-Modul (wichtig für Delta Time / dt)
     t.modules.touch = false                    -- Aktiviert Touchscreen-Support
-    t.modules.video = true                    -- Aktiviert Video-Wiedergabe
+    t.modules.video = false                    -- Aktiviert Video-Wiedergabe
     t.modules.window = true                   -- Aktiviert Fenster-Management
 end

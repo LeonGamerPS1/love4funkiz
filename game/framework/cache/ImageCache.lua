@@ -27,4 +27,13 @@ function ImageCache:exists(path)
     return ImageCache.images[path] ~= nil
 end
 
+function ImageCache:release()
+    
+    for key, value in pairs(ImageCache.images) do
+        ImageCache.images[key] = nil
+        value:release()
+        value = nil
+    end
+end
+
 return ImageCache
